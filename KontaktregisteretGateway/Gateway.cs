@@ -4,6 +4,8 @@ using System.ServiceModel.Channels;
 using System.ServiceModel.Description;
 using System.ServiceModel.Security;
 using KontaktregisteretGateway.Difi;
+using System.Threading;
+using System.Globalization;
 
 namespace KontaktregisteretGateway
 {
@@ -11,24 +13,22 @@ namespace KontaktregisteretGateway
     {
         public HentPersonerResponse Execute(string[] personalNumber)
         {
-            var serviceEndpoint = new EndpointAddress(new Uri("https://kontaktinfo-ws-ver2.difi.no/kontaktinfo-external/ws-v3"));
+            Thread.CurrentThread.CurrentUICulture = new CultureInfo("en-US");
+            EndpointIdentity identity = EndpointIdentity.CreateDnsIdentity("trustedserviceowner.somedomain.no");
+            var serviceEndpoint = new EndpointAddress(new Uri("https://kontaktinfo-ws-ver2.difi.no/kontaktinfo-external/ws-v3"), identity);
+            
 
             var binding = new CustomBinding();
 
-            var securityBinding =
-                  (AsymmetricSecurityBindingElement)SecurityBindingElement.CreateMutualCertificateBindingElement(
-                          MessageSecurityVersion.WSSecurity10WSTrustFebruary2005WSSecureConversationFebruary2005WSSecurityPolicy11BasicSecurityProfile10);
 
-            securityBinding.LocalClientSettings.IdentityVerifier = new MyIdentityVerifier();
-            securityBinding.DefaultAlgorithmSuite = SecurityAlgorithmSuite.Basic128Rsa15;
 
+            var securityBinding = SecurityBindingElement.CreateCertificateOverTransportBindingElement(MessageSecurityVersion.WSSecurity10WSTrustFebruary2005WSSecureConversationFebruary2005WSSecurityPolicy11BasicSecurityProfile10);
             securityBinding.IncludeTimestamp = true;
-            securityBinding.MessageProtectionOrder = MessageProtectionOrder.SignBeforeEncrypt;
-            securityBinding.EnableUnsecuredResponse = true;
+            securityBinding.AllowInsecureTransport = true;
             
             binding.Elements.Add(securityBinding);
             
-            binding.Elements.Add(new TextMessageEncodingBindingElement() { MessageVersion = MessageVersion.Soap12 });
+            binding.Elements.Add(new TextMessageEncodingBindingElement() { MessageVersion = MessageVersion.Soap11 });
             binding.Elements.Add(new HttpsTransportBindingElement());
             
             using (var factory =
@@ -67,9 +67,9 @@ namespace KontaktregisteretGateway
         private static void SetupCertificates(MyClientCredentials credentials)
         {
             credentials.ClientEncryptingCertificate = new System.Security.Cryptography.X509Certificates.X509Certificate2("Certificates\\idporten-ver2.difi.no-v2.crt", "changeit");
-            credentials.ClientSigningCertificate = new System.Security.Cryptography.X509Certificates.X509Certificate2("Certificates\\WcfClient.pfx", "changeit");
+            credentials.ClientSigningCertificate = new System.Security.Cryptography.X509Certificates.X509Certificate2("Certificates\\client.pfx", "changeit");
 
-            credentials.ServiceEncryptingCertificate = new System.Security.Cryptography.X509Certificates.X509Certificate2("Certificates\\WcfClient.pfx", "changeit");
+            credentials.ServiceEncryptingCertificate = new System.Security.Cryptography.X509Certificates.X509Certificate2("Certificates\\client.pfx", "changeit");
             credentials.ServiceSigningCertificate = new System.Security.Cryptography.X509Certificates.X509Certificate2("Certificates\\idporten-ver2.difi.no-v2.crt", "changeit");
         }
     }
